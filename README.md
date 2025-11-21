@@ -211,7 +211,7 @@ Produced to orders-dlq: Order{orderId=-5, product=Keyboard, price=50.0}
 
 ### Step 1: Start Kafka Infrastructure
 
-```bash
+```
 docker-compose up -d
 ```
 
@@ -221,13 +221,13 @@ This starts:
 - **Schema Registry** - Port 8081
 
 **Verify containers are running:**
-```bash
+```
 docker ps
 ```
 
 ### Step 2: Build the Project
 
-```bash
+```
 mvn clean package
 ```
 
@@ -239,7 +239,7 @@ This will:
 ### Step 3: Run the Application
 
 **Option A: Using Maven**
-```bash
+```
 mvn exec:java -Dexec.mainClass="com.kafka.assignment.MainApp"
 ```
 
@@ -257,21 +257,21 @@ System ready.
 ### Step 4: Send Test Orders
 
 **Valid Order (Normal Processing):**
-```bash
+```
 curl -X POST http://localhost:8080/order ^
   -H "Content-Type: application/json" ^
   -d "{\"orderId\":\"1001\",\"product\":\"Laptop\",\"price\":1200.50}"
 ```
 
 **Retry Order (Decimal orderId):**
-```bash
+```
 curl -X POST http://localhost:8080/order ^
   -H "Content-Type: application/json" ^
   -d "{\"orderId\":\"1.5\",\"product\":\"Mouse\",\"price\":25.99}"
 ```
 
 **DLQ Order (Negative orderId):**
-```bash
+```
 curl -X POST http://localhost:8080/order ^
   -H "Content-Type: application/json" ^
   -d "{\"orderId\":\"-5\",\"product\":\"Keyboard\",\"price\":75.00}"
