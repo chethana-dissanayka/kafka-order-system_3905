@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Console appender for clean output -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Set Kafka logs to WARN to reduce noise -->
+    <logger name="org.apache.kafka" level="WARN"/>
+
+    <!-- Set Jetty logs to INFO -->
+    <logger name="org.eclipse.jetty" level="INFO"/>
+
+    <!-- Set Avro and Confluent logs to WARN -->
+    <logger name="org.apache.avro" level="WARN"/>
+    <logger name="io.confluent" level="WARN"/>
+
+    <!-- Root logger -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>
+
