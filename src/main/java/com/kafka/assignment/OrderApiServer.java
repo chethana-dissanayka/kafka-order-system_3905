@@ -78,37 +78,34 @@ public class OrderApiServer {
 
                         switch (validationResult) {
                             case DLQ:
-                                // Negative orderId -> send to DLQ
-
-                                System.out.println("\n❌ PERMANENT FAILURE in order + " + order);
-                                System.out.println("📮 Sending order to Dead Letter Queue (DLQ) for manual inspection...");
 
                                 orderProducer.sendToTopic(Config.get("topic.dlq"), order);
                                 resp.setStatus(HttpServletResponse.SC_ACCEPTED);
-                                resp.getWriter().println("⚠️ ERROR: Negative orderId detected. Order sent to DLQ.");
+                                resp.getWriter().println("Order sent to DLQ.");
+                                System.out.println("\nPERMANENT FAILURE in order :" + order);
+                                System.out.println("Sending order to Dead Letter Queue (DLQ) for manual inspection...");
                                 break;
 
                             case RETRY:
-                                // Float orderId -> send to retry topic
-                                System.out.println("\n⚠️ Temporary flier in order " + order);
-                                System.out.println("🔄 RETRYING............");
 
                                 orderProducer.sendToTopic(Config.get("topic.retry"), order);
                                 resp.setStatus(HttpServletResponse.SC_ACCEPTED);
-                                resp.getWriter().println("⚠️ ERROR: Float orderId detected. Retrying order...");
+                                resp.getWriter().println("Retrying order...");
+                                System.out.println("\nTemporary falier in order " + order);
+                                System.out.println("RETRYING............");
                                 break;
 
                             case VALID:
-                                // Valid orderId -> send to normal orders topic
+
                                 System.out.println("\n");
                                 orderProducer.send(order);
                                 resp.setStatus(HttpServletResponse.SC_OK);
-                                resp.getWriter().println("✅ Order processed successfully: " + order);
+                                resp.getWriter().println("Order processed successfully " );
                                 break;
 
                             case INVALID:
                                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                                resp.getWriter().println("❌ ERROR: Invalid orderId format. Must be a number.");
+                                resp.getWriter().println("ERROR: Invalid orderId format. Must be a number.");
                                 resp.getWriter().println("Order sent: " + order);
                         }
                     } catch (NumberFormatException e) {
