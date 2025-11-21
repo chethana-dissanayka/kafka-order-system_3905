@@ -17,7 +17,6 @@ public class OrderValidator {
 
         String trimmed = orderId.trim();
 
-
         if (trimmed.contains(".")) {
             try {
                 Double.parseDouble(trimmed);

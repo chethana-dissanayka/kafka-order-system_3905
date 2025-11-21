@@ -16,7 +16,7 @@ This project implements a **complete Kafka-based order processing system** that 
 
 ```
 ┌─────────────┐      HTTP POST       ┌──────────────────┐
-│   Client    │ ──────────────────► │ OrderApiServer   │
+│   Client    │ ──────────────────►  │ OrderApiServer   │
 │ (Postman)   │                      │   (Port 8080)    │
 └─────────────┘                      └──────────────────┘
                                               │
@@ -63,12 +63,12 @@ This project implements a **complete Kafka-based order processing system** that 
 1. **OrderApiServer** - Jetty-based REST API endpoint accepting order submissions via HTTP POST on port 8080
 2. **OrderValidator** - Validates orderId and returns ValidationResult enum (VALID, RETRY, DLQ, INVALID)
 3. **OrderProducer** - Publishes messages to appropriate Kafka topics with Avro serialization and callback handlers
-4. **OrderConsumer** - Consumes messages from `orders` topic and handles retry logic for "fail" orderId
+4. **OrderConsumer** - Consumes messages from `orders` topic and processes valid orders
 5. **PriceAggregator** - Thread-safe real-time aggregation using AtomicInteger and AtomicReference
 6. **Kafka Topics:**
    - `orders` - Valid orders for normal processing
-   - `orders-retry` - Temporary failures (decimal orderIds or retry attempts)
-   - `orders-dlq` - Permanent failures (negative orderIds or max retries exceeded)
+   - `orders-retry` - Temporary failures (decimal orderIds)
+   - `orders-dlq` - Permanent failures (negative orderIds)
 
 ---
 
@@ -85,9 +85,8 @@ This project implements a **complete Kafka-based order processing system** that 
 **Consumer (`OrderConsumer.java`):**
 - Consumes messages from `orders` topic in real-time
 - Processes each order and updates aggregation statistics via `PriceAggregator`
-- Implements retry logic for special "fail" orderId (retries up to max configured times)
-- Sends permanently failed messages to DLQ after max retries exceeded
 - Uses `KafkaAvroDeserializer` with `specific.avro.reader=true`
+- Displays processed orders in console
 
 ### 2. Avro Serialization
 
@@ -127,16 +126,8 @@ Running Average Price: $490.20
 **Producer-Level Routing:**
 - **Decimal orderId** (e.g., "1.5") → Routes to `orders-retry` topic immediately
 - **Negative orderId** (e.g., "-5") → Routes to `orders-dlq` topic immediately
+- **Invalid format** (e.g., "abc", "fail") → Rejected with HTTP 400 error
 
-**Consumer-Level Retry:**
-- **Special orderId "fail"** → Consumer retries up to 3 times, then sends to DLQ
-- Retry attempts are tracked and logged
-
-**Configuration:** `config.properties`
-```properties
-max.retries=3
-retry.backoff.ms=3000
-```
 
 **Validation Logic (`OrderValidator.java`):**
 ```java
@@ -144,7 +135,7 @@ ValidationResult:
 - VALID:   Non-negative integer (e.g., "123", "0", "1001")
 - RETRY:   Contains decimal point (e.g., "1.5", "10.5")
 - DLQ:     Negative integer (e.g., "-1", "-100")
-- INVALID: Null, empty, or non-numeric (e.g., "", "abc")
+- INVALID: Null, empty, or non-numeric (e.g., "", "abc", "fail")
 ```
 
 **Producer Console Output:**
@@ -154,11 +145,10 @@ RETRYING............
 Produced to orders-retry: Order{orderId=1.5, product=Mouse, price=100.0}
 ```
 
-### 5️. Dead Letter Queue (DLQ)
+### 5. Dead Letter Queue (DLQ)
 
 **Permanent Failure Criteria:**
 - **Negative orderId** (e.g., "-5") → Immediately sent to DLQ
-- **Max retries exceeded** → Sent to DLQ after 3 failed attempts
 
 **DLQ Topic:** `orders-dlq`
 
@@ -185,9 +175,7 @@ Produced to orders-dlq: Order{orderId=-5, product=Keyboard, price=50.0}
    - `INVALID` → Return HTTP 400 error
 5. **Producer Sends** → `OrderProducer.sendToTopic()` with Avro serialization
 6. **Consumer Receives** → `OrderConsumer` polls from `orders` topic
-7. **Processing** → Check if orderId equals "fail":
-   - Yes → Retry up to `max.retries` times, then DLQ
-   - No → Process normally
+7. **Processing** → Process order normally
 8. **Aggregation** → `PriceAggregator.addPrice()` updates running statistics
 9. **Display** → Console shows aggregation table
 
@@ -207,7 +195,7 @@ Produced to orders-dlq: Order{orderId=-5, product=Keyboard, price=50.0}
 **Consumer-Level:**
 - Try-catch block around order processing
 - Errors logged to console with exception message
-- Failed "fail" orders sent to DLQ after max retries
+- Continuous polling for new messages
 
 ---
 
