@@ -11,9 +11,6 @@ import java.util.Properties;
 
 public class OrderConsumer {
 
-    private static int maxRetries = Integer.parseInt(Config.get("max.retries"));
-    private static int retryCount = 0;
-
     public static void main(String[] args) {
 
         Properties props = new Properties();
@@ -50,22 +47,25 @@ public class OrderConsumer {
     }
 
     private static void process(Order order) {
-        if (order.getOrderId().equals("fail")) {
-            if (retryCount < maxRetries) {
-                retryCount++;
-                System.out.println("Retrying order: " + order + " (Attempt " + retryCount + ")");
-                sendToTopic(Config.get("topic.retry"), order);
-                throw new RuntimeException("Simulated failure for retry");
-            } else {
-                System.out.println("Sending to DLQ: " + order);
-                sendToTopic(Config.get("topic.dlq"), order);
-                retryCount = 0; // Reset for the next order
-            }
-        } else {
-            System.out.println("✓ Processed: " + order);
+        String orderId = order.getOrderId().toString();
+        OrderValidator.ValidationResult result = OrderValidator.validateOrderId(orderId);
 
-            // Real-time Price Aggregation - Calculate running average
-            PriceAggregator.addPrice(order.getPrice());
+        switch (result) {
+            case VALID:
+                System.out.println("✓ Processed: " + order);
+                // Real-time Price Aggregation - Calculate running average
+                PriceAggregator.addPrice(order.getPrice());
+                break;
+
+            case RETRY:
+                System.out.println("Retrying order " + order);
+                sendToTopic(Config.get("topic.retry"), order);
+                break;
+
+            case DLQ:
+                System.out.println("Sending to DLQ : " + order);
+                sendToTopic(Config.get("topic.dlq"), order);
+                break;
         }
     }
 
@@ -81,7 +81,7 @@ public class OrderConsumer {
 
         KafkaProducer<String, Order> producer = new KafkaProducer<>(props);
 
-        producer.send(new ProducerRecord<>(topic, (String) order.getOrderId(), order));
+        producer.send(new ProducerRecord<>(topic, order.getOrderId().toString(), order));
         producer.close();
     }
 }
